@@ -77,16 +77,16 @@ func (i IBCHandler) OnChanOpenTry(
 	portID, channelID string,
 	chanCap *capabilitytypes.Capability,
 	counterParty channeltypes.Counterparty,
-	version, counterpartyVersion string,
-) error {
+	counterpartyVersion string,
+) (version string, err error) {
 	// ensure port, version, capability
 	if err := ValidateChannelParams(channelID); err != nil {
-		return err
+		return version, err
 	}
 
 	contractAddr, err := ContractFromPortID(portID)
 	if err != nil {
-		return sdkerrors.Wrapf(err, "contract port id")
+		return version, sdkerrors.Wrapf(err, "contract port id")
 	}
 
 	msg := wasmvmtypes.IBCChannelOpenMsg{
@@ -104,7 +104,7 @@ func (i IBCHandler) OnChanOpenTry(
 
 	err = i.keeper.OnOpenChannel(ctx, contractAddr, msg)
 	if err != nil {
-		return err
+		return version, err
 	}
 	// Module may have already claimed capability in OnChanOpenInit in the case of crossing hellos
 	// (ie chainA and chainB both call ChanOpenInit before one of them calls ChanOpenTry)
@@ -113,10 +113,10 @@ func (i IBCHandler) OnChanOpenTry(
 	if !i.keeper.AuthenticateCapability(ctx, chanCap, host.ChannelCapabilityPath(portID, channelID)) {
 		// Only claim channel capability passed back by IBC module if we do not already own it
 		if err := i.keeper.ClaimCapability(ctx, chanCap, host.ChannelCapabilityPath(portID, channelID)); err != nil {
-			return sdkerrors.Wrap(err, "claim capability")
+			return version, sdkerrors.Wrap(err, "claim capability")
 		}
 	}
-	return nil
+	return version, nil
 }
 
 // OnChanOpenAck implements the IBCModule interface
